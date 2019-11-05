@@ -1,0 +1,22 @@
+// BOOLEAN module used in ALU module
+module boolean (
+    input a[16],      // 16-bit input A
+    input b[16],      // 16-bit input B
+    input alufn[4],   // 6-bit input ALUFN
+    output boole[16]  // 16-bit output BOOLEAN
+  ) {
+
+  always {
+      case(alufn) {
+        b1000: boole = a & b;       // AND command
+        b0111: boole = ~(a & b);    // NAND command
+        b1110: boole = a | b;       // OR command
+        b0001: boole = ~ (a | b);   // NOR command
+        b0110: boole = a ^ b;       // XOR command
+        b1001: boole = ~ ( a ^ b);  // XNOR command
+        b1010: boole = a;           // "A" command 
+        b1100: boole = b;           // "B" command
+        default: boole = 16b0;      // default
+      }
+  } 
+}

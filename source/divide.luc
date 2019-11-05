@@ -1,0 +1,10 @@
+module divide (
+    input a[16], //16 bit input for multipler 
+    input b[16], //16 bit input for multiplier 
+    output div[16] //16 bit output for multiplier 
+  ) {
+
+  always {
+    div = a / b;
+  }
+}

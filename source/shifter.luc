@@ -1,0 +1,17 @@
+// SHIFTER module used in ALU module
+module shifter (
+    input a[16],      // 16-bit input A
+    input b[4],       // 0-3 bits input B
+    input alufn[2],   // 6-bit input ALUFN
+    output shift[16]  // 16-bit output SHIFTER
+  ) {
+
+  always {
+    case(alufn) {
+      b00: shift = a << b;            // SHL (shift left by value of last 4 bits of b)
+      b01: shift = a >> b;            // SHR (shift right by value of last 4 bits of b)
+      b11: shift = $signed(a) >>> b;  // SRA (shift right with sign extension by value of last 4 bits of b)
+      default: shift = 16b0;          // default
+    }
+  }
+}

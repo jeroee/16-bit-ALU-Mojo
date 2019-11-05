@@ -1,0 +1,20 @@
+// COMPARE module used in ALU module
+module compare (
+    input z,         // input z
+    input v,         // input v
+    input n,         // input n
+    input alufn[2],  // 6-bit input ALUFN
+    output cmp[16]   // 16-bit output COMPARE
+  ) {
+
+  always {                        // alufn[1:0] always set to 01 (a - b) 
+    cmp[15:1] = 15b0;             // high order 15 bits of the output are always zero
+    
+    case(alufn) {
+      b01: cmp[0] = z;            // A = B
+      b10: cmp[0] = n ^ v;        // A < B
+      b11: cmp[0] = z | (n ^ v);  // A <= B
+      default: cmp[0] = b0;       // default LSB
+    }
+  }
+}

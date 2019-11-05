@@ -1,0 +1,171 @@
+module mojo_top (
+    input clk,              // 50MHz clock
+    input rst_n,            // reset button (active low)
+    output led [8],         // 8 user controllable LEDs
+    input cclk,             // configuration clock, AVR ready when high
+    output spi_miso,        // AVR SPI MISO
+    input spi_ss,           // AVR SPI Slave Select
+    input spi_mosi,         // AVR SPI MOSI
+    input spi_sck,          // AVR SPI Clock
+    output spi_channel [4], // AVR general purpose pins (used by default to select ADC channel)
+    input avr_tx,           // AVR TX (FPGA RX)
+    output avr_rx,          // AVR RX (FPGA TX)
+    input avr_rx_busy,      // AVR RX buffer full
+        
+    output io_led [3][8],   // LEDs on IO Shield, 3 outputs connected to pins 15,16,17 from FPGA (inputs Cin, A, B into Full Adder)
+    output io_seg [8],      // 7-segment LEDs on IO Shield
+    output io_sel [4],      // Digit select on IO Shield
+    input io_button [5],    // 5 buttons on IO Shield up-0,centre-1, bottom-2, left-3, right-4
+    input io_dip [3][8]     // DIP switches on IO Shield
+  ) {
+  
+  sig rst;                  // reset signal
+  
+  .clk(clk) {
+    // The reset conditioner is used to synchronize the reset signal to the FPGA
+    // clock. This ensures the entire FPGA comes out of reset at the same time.
+    reset_conditioner reset_cond;
+    
+    
+    .rst(rst) {
+      multi_seven_seg seg;                // adding MULTI_SEVEN_SEGMENT module
+      slowCount myCount;                  // adding SLOWCOUNT module
+      fsm state = {MANUAL, AUTO};         // defining finite state machines (FSMs)
+    }
+  }
+  
+  alu alu;            // adding ALU module
+  alufn_count acnt;   // adding ALUFN_COUNT module
+  sig a[16];          // 16b0 (sig: bits declaration | var: variable declaration)
+  sig b[16];          // 16b0
+  sig alufn[6];       // 6-bit ALUFN
+  sig error[16];      // 16-bit ERROR
+  sig alufn_err[6];   // 6-bit ALUFN during ERROR
+  
+  always {
+    // Default file unchanged.
+    reset_cond.in = ~rst_n;               // input raw inverted reset signal
+    rst = reset_cond.out;                 // conditioned reset
+    led = 8h00;                           // turn LEDs off
+    spi_miso = bz;                        // not using SPI
+    spi_channel = bzzzz;                  // not using flags
+    avr_rx = bz;                          // not using serial port 
+    
+    seg.values = {4h0, 4h0, 4h0};         // the segments will display "000" by default
+    
+    io_seg = ~seg.seg;                    // connect segments to the driver
+    io_sel = ~seg.sel;                    // connect digit select to the driver
+    io_led = 3x{{8h00}};                  // turn LEDs off
+
+    io_led[2][7] = io_dip[2][7];          // connects switch 23 to LED 23 (most left to change states between MANUAL and AUTO
+    
+    led[0] = alu.z;
+    led[3] = alu.v;
+    led[6] = alu.n;
+    a = 16b0;
+    b = 16b0;
+    acnt.count = 4b0;
+    error = 16b0;
+    alufn_err = 6b0;
+
+    // TEST CASE 1: A = 1010101010101010 (-21846) ; B = 0101010101010101 (21845)
+    // EXPECTED ADDER: ADD = 1111111111111111 (-1) ; SUB = 0101010101010101 (-43691)(with overflow) ; MUL = 0001110001110010 (-477225870) ;
+    // EXPECTED BOOLEAN: AND = 0000000000000000 ; OR = 1111111111111111; XOR = 1111111111111111; A = 0101010101010101
+    // EXPECTED SHIFTER: 
+    // EXPECTED COMPARE: 
+    if (io_dip[0][0]) {
+      a = 16b1010101010101010;
+      b = 16b0101010101010101;
+      seg.values = {4h0, 4h0, 4h1};
+    }
+    
+    // TEST CASE 2: A = 0000000001110010 (114) = ; B = 0000000000010011 (19) 
+    // ADD = 0000000010000101 (133) SUB = 0000000001011111 (95) MUL = 0000100001110110 (12166) 
+    // BOOL AND = 0000000000010010; NAND = 0000000001101101; OR = 0000000001110011; NOR = 0000000000001100;  XOR = 0000000001100001;
+    // XNOR = 0000000000011110
+    // SL = 0000001110010000 SR = 0000000000001110
+    // CMPEQ = 0 ; CMPLT = 0; CMPLE = 0;
+    else if (io_dip[0][1]) {
+      a = 16b0000000001110010;
+      b = 16b0000000000010011;
+      seg.values = {4h0, 4h0, 4h2};
+    }
+    
+    // TEST CASE 3: A = 1111111111111011(-5) = ; B = 1111111111111011(-5) (check for CMP)
+    // CMPEQ = 1 ; CMPLT = 0; CMPLE = 1;
+    else if (io_dip[0][2]) {
+      a = 16b1111111111111011;
+      b = 16b1111111111111011;
+      seg.values = {4h0, 4h0, 4h3};
+    }
+    
+    // TEST CASE 4: A = 1111111111100101 (-27) = ; B = 0000000000001001 (9) 
+    // ADD = 1111111111101110 (-18); SUB = 1111111111011100 (-36); MUL = 1111111100001101(-243); 
+    // AND = 0000000000000001 ; NAND = 1111111111111110; OR = 1111111111101101; NOR = 0000000000010010; XOR = 1111111111101100; XNOR = 0000000000010011;
+    // SL = 1111111111001010; SR = 011111111110010; SRA = 1111111111110010;
+    // CMPEQ = 0; CMPLT = 0; CMPLE = 0;
+    else if (io_dip[0][3]) {
+      a = 16b1111111111100101;
+      b = 16b0000000000001001;
+      seg.values = {4h0, 4h0, 4h4};
+    }
+    
+    // TEST CASE 5: A = 0101010101010101 = ; B = 1010101010101010 =
+    else if (io_dip[0][4]) {
+      a = 16b0101010101010101;
+      b = 16b1010101010101010;
+      seg.values = {4h0, 4h0, 4h5};
+    }
+    
+    alu.a = a;
+    alu.b = b;
+    alu.alufn = 6b0;
+
+    case (state.q) {
+      state.MANUAL:
+        // switch 23 (most left) is turned ON to enable automatic testing
+        if (io_dip[2][7]) { 
+          state.d = state.AUTO;
+        }
+        
+        io_led[2][5:0] = io_dip[2][5:0];  // connects switches 16-21 to respective LED (6-bit ALUFN inputs)        
+        alufn = io_dip[2][5:0];           // alufn
+        alu.alufn = alufn;
+        
+        if (io_dip[1][0]) {
+          alufn_err = alufn;
+          error = alu.alu + 16b0101010101010101;
+          io_led[0][7:0] = error[7:0];
+          io_led[1][7:0] = error[15:8];
+          seg.values = {4h7, 4h8, 4h8};
+        }
+          
+        else {
+          io_led[0][7:0] = alu.alu[7:0];
+          io_led[1][7:0] = alu.alu[15:8];
+        }
+      
+      state.AUTO:
+        // switch 23 (most left) is turned OFF to enable manual testing
+        if (!io_dip[2][7]) {
+          state.d = state.MANUAL;
+        }
+        acnt.count = myCount.value;
+        alu.alufn = acnt.alufn;
+        io_led[2][5:0] = acnt.alufn;
+        
+        if (io_dip[1][0]) {
+          alufn_err = acnt.alufn;
+          error = alu.alu + 16b0101010101010101;
+          io_led[0][7:0] = error[7:0];
+          io_led[1][7:0] = error[15:8];
+          seg.values = {4h7, 4h8, 4h8};
+        }
+ 
+        else {
+          io_led[0][7:0] = alu.alu[7:0];
+          io_led[1][7:0] = alu.alu[15:8];
+        }
+    }
+  }
+}

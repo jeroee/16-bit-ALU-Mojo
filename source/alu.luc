@@ -1,0 +1,47 @@
+module alu(
+    input a[16],      // 16-bit input A
+    input b[16],      // 16-bit input B
+    input alufn[6],   // 6-bit input ALUFN
+    output alu[16],   // 16-bit output ALU
+    output z,
+    output v,
+    output n
+  ) {
+
+  adder add;          // ADDER module (include MULTIPLY)
+  compare cmp;        // COMPARE module
+  boolean boole;      // BOOLEAN module
+  shifter shift;      // SHIFTER module
+
+  always {
+    // inputs for modules
+    add.a = a;                 // connect input A to ADDER module
+    add.b = b;                 // connect input B to ADDER module
+    add.alufn = alufn[1:0];    // connect ALUFN to ADDER module
+
+    cmp.z = add.z;             // connect ADDER output Z to COMPARE input Z 
+    cmp.v = add.v;             // connect ADDER output V to COMPARE input V 
+    cmp.n = add.n;             // connect ADDER output N to COMPARE input N
+    cmp.alufn = alufn[3:2];    // connect ALUFN to COMPARE module
+
+    boole.a = a;               // connect input A to BOOLEAN module
+    boole.b = b;               // connect input B to BOOLEAN module
+    boole.alufn = alufn[3:0];  // connect ALUFN to BOOLEAN module
+
+    shift.a = a;               // connect input A to SHIFTER module
+    shift.b = b[3:0];          // connect input B (least significant 4-bits) to SHFIFTER
+    shift.alufn = alufn[1:0];  // connect ALUFN to SHIFTER module
+  
+    case(alufn[5:4]) {
+      b00: alu = add.s;         // select ADDER if ALUFN[5:4] = 00
+      b01: alu = boole.boole;   // select BOOLEAN if ALUFN[5:4] = 01
+      b10: alu = shift.shift;   // select SHIFTER if ALUFN[5:4] = 10
+      b11: alu = cmp.cmp;       // select COMPARE if ALUFN[5:4] = 11
+      default: alu = 16b0;      // default ALU value
+    }
+    
+    z = add.z;
+    v = add.v;
+    n = add.n;
+  }
+}

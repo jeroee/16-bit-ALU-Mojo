@@ -1,0 +1,40 @@
+// ADDER module used in ALU module
+module adder (
+    input a[16],      // 16-bit input A
+    input b[16],      // 16-bit input B
+    input alufn[2],   // 6-bit input ALUFN
+    output z,         // output z
+    output v,         // output v
+    output n,         // output n
+    output s[16]      // 16-bit output SUM
+  ) {
+  
+  sig out[16];
+
+  always {
+    case(alufn) {
+      b00: 
+        out = a + b;                                                         // select ADD if ALUFN[1:0] = 00
+        z = ~|out;                                                           // Z is true when S outputs are all zero
+        v = (((a[15])&(b[15])&(~out[15])) | ((~a[15])&(~b[15])&(out[15])));  // V is true when addition operation overflows
+        n = out[15];                                                         // N is true when the S15 = 1 (negative)
+      b01: 
+        out = a - b;                                                         // select SUBTRACT if ALUFN[1:0] = 01
+        z = ~|out;                                                           // Z is true when S outputs are all zero
+        v = (((a[15])&(~b[15])&(~out[15])) | ((~a[15])&(b[15])&(out[15])));  // V is true when subtraction operation overflows
+        n = out[15];                                                         // N is true when the S15 = 1 (negative)
+      b10: 
+        out = a * b;                                                         // select MULTIPLY if ALUFN[1:0] = 10
+        z = b0;                                                              // MULTIPLY has no Z,V,N signal output
+        v = b0;
+        n = b0;
+
+      default:                                                               // default
+        out = 16b0;
+        z = b0;
+        v = b0;
+        n = b0;
+    }
+    s = out[15:0];  // define S output
+  }
+}

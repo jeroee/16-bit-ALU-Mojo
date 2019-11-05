@@ -1,0 +1,18 @@
+module slowCount (
+    input clk,  // clock
+    input rst,  // reset   
+    output value[4]
+  ) {
+  
+  .clk(clk), .rst(rst) {
+    dff flip[25];
+  }
+  
+  counter ctr(.rst(rst));
+
+  always {
+    ctr.clk = flip.q[24];
+    flip.d = flip.q + 1;
+    value = ctr.value;
+  }
+}
