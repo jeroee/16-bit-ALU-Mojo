@@ -40,7 +40,6 @@ module mojo_top (
   sig b[16];          // 16b0
   sig alufn[6];       // 6-bit ALUFN
   sig error[16];      // 16-bit ERROR
-  sig alufn_err[6];   // 6-bit ALUFN during ERROR
   
   always {
     // Default file unchanged.
@@ -66,13 +65,10 @@ module mojo_top (
     b = 16b0;
     acnt.count = 4b0;
     error = 16b0;
-    alufn_err = 6b0;
 
     // TEST CASE 1: A = 1010101010101010 (-21846) ; B = 0101010101010101 (21845)
-    // EXPECTED ADDER: ADD = 1111111111111111 (-1) ; SUB = 0101010101010101 (-43691)(with overflow) ; MUL = 0001110001110010 (-477225870) ;
+    // EXPECTED ADDER: ADD = 1111111111111111 (-1) ; SUB = 0101010101010101 (-43691)(with overflow) ; MUL = 0001110001110010 (-477225870);
     // EXPECTED BOOLEAN: AND = 0000000000000000 ; OR = 1111111111111111; XOR = 1111111111111111; A = 0101010101010101
-    // EXPECTED SHIFTER: 
-    // EXPECTED COMPARE: 
     if (io_dip[0][0]) {
       a = 16b1010101010101010;
       b = 16b0101010101010101;
@@ -110,13 +106,6 @@ module mojo_top (
       seg.values = {4h0, 4h0, 4h4};
     }
     
-    // TEST CASE 5: A = 0101010101010101 = ; B = 1010101010101010 =
-    else if (io_dip[0][4]) {
-      a = 16b0101010101010101;
-      b = 16b1010101010101010;
-      seg.values = {4h0, 4h0, 4h5};
-    }
-    
     alu.a = a;
     alu.b = b;
     alu.alufn = 6b0;
@@ -129,19 +118,19 @@ module mojo_top (
         }
         
         io_led[2][5:0] = io_dip[2][5:0];  // connects switches 16-21 to respective LED (6-bit ALUFN inputs)        
-        alufn = io_dip[2][5:0];           // alufn
+        alufn = io_dip[2][5:0];           // 6-bit ALUFN is connected to switches 16-21
         alu.alufn = alufn;
         
+        // switch 8 is turned ON to inflict ERROR to 16-bit ALU output
         if (io_dip[1][0]) {
-          alufn_err = alufn;
           error = alu.alu + 16b0101010101010101;
-          io_led[0][7:0] = error[7:0];
+          io_led[0][7:0] = error[7:0];    // IO LEDs 0-15 outputs ALU with error
           io_led[1][7:0] = error[15:8];
-          seg.values = {4h7, 4h8, 4h8};
+          seg.values = {4h7, 4h8, 4h8};   // seven segment reads "Err"
         }
           
         else {
-          io_led[0][7:0] = alu.alu[7:0];
+          io_led[0][7:0] = alu.alu[7:0];  // IO LEDs 0-15 outputs ALU
           io_led[1][7:0] = alu.alu[15:8];
         }
       
@@ -150,20 +139,20 @@ module mojo_top (
         if (!io_dip[2][7]) {
           state.d = state.MANUAL;
         }
-        acnt.count = myCount.value;
+        acnt.count = myCount.value;       // changes the output values of 6-bits ALUFN automatically
         alu.alufn = acnt.alufn;
-        io_led[2][5:0] = acnt.alufn;
+        io_led[2][5:0] = acnt.alufn;      // 6-bit ALUFN is connected to switches 16-21
         
+        // switch 8 is turned ON to inflict ERROR to 16-bit ALU output
         if (io_dip[1][0]) {
-          alufn_err = acnt.alufn;
           error = alu.alu + 16b0101010101010101;
-          io_led[0][7:0] = error[7:0];
+          io_led[0][7:0] = error[7:0];    // IO LEDs 0-15 outputs ALU with error
           io_led[1][7:0] = error[15:8];
-          seg.values = {4h7, 4h8, 4h8};
+          seg.values = {4h7, 4h8, 4h8};   // seven segment reads "Err"
         }
  
         else {
-          io_led[0][7:0] = alu.alu[7:0];
+          io_led[0][7:0] = alu.alu[7:0];  // IO LEDs 0-15 outputs ALU
           io_led[1][7:0] = alu.alu[15:8];
         }
     }
